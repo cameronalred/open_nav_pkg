@@ -1,0 +1,65 @@
+<?xml version="1.0" ?>
+<launch>
+	<arg name="rtabmap_args" 		default="--delete_db_on_start --Optimizer/GravitySigma 0.3"/>
+	<arg name="depth_topic" 		value="/camera/aligned_depth_to_color/image_raw"/>
+	<arg name="rgb_topic" 			value="/camera/color/image_raw"/>
+	<arg name="camera_info_topic" 	value="/camera/color/camera_info"/>
+	<arg name="frame_id" 			value="world"/>
+	<arg name="odom_frame_id"		value="world"/>
+	<arg name="approx_sync" 		value="false"/>
+	<arg name="color_height"		value="270"/>
+	<arg name="color_width"			value="480"/>
+	<arg name="color_fps"			value="30"/>
+	<arg name="depth_height"		value="270"/>
+	<arg name="depth_width"			value="480"/>
+	<arg name="depth_fps"			value="30"/>
+
+	<arg name="imu_topic" 			value="/rtabmap/imu"/>
+	<arg name="unite_imu_method"	value="linear interpolation"/>
+	<arg name="enable_gyro" 		value="true"/>
+	<arg name="enable_accel" 		value="true"/>
+
+	<arg name="sim" 				value="false"/>
+	<arg name="rviz_config"         default="$(find open_nav_pkg)/config/openmanip_scanning.rviz"/>
+
+	<!-- realsense camera node and TF publishers -->
+	<include file="$(find realsense2_camera)/launch/rs_camera.launch">
+		<arg name="json_file_path"		value="$(find open_nav_pkg)/config/CloseUpScan.json"/>
+		<arg name="align_depth" 		value="true"/>
+		<arg name="depth_height"		value="$(arg depth_height)"/>
+		<arg name="depth_width"			value="$(arg depth_width)"/>
+		<arg name="depth_fps"			value="$(arg depth_fps)"/>
+		<arg name="unite_imu_method"	value="$(arg unite_imu_method)"/>
+		<arg name="enable_gyro" 		value="$(arg enable_gyro)"/>
+		<arg name="enable_accel" 		value="$(arg enable_accel)"/>
+	</include>
+	<!--IMU filter-->
+	<node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_madgwick" output="screen" respawn="false">
+		<param name="use_mag" value="false"/>
+		<param name="publish_tf" value="false"/>
+		<param name="world_frame" value="enu"/>
+		<remap from="/imu/data_raw" to="/camera/imu"/>
+		<remap from="/imu/data" to="/rtabmap/imu"/>
+	</node>
+	-->
+	<!--rtabmap scanning/odom-->
+	<include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+		<arg name="rtabmap_args"		value="--delete_db_on_start --Optimizer/GravitySigma 0.3"/>
+		<arg name="depth_topic"			value="/camera/aligned_depth_to_color/image_raw"/>
+    	<arg name="rgb_topic"			value="/camera/color/image_raw"/>
+   		<arg name="camera_info_topic"	value="/camera/color/camera_info"/>
+    	<arg name="approx_sync" 		value="false"/>
+    	<arg name="wait_imu_to_init"	value="false"/>
+    	<arg name="imu_topic"			value="/rtabmap/imu"/>
+		<arg name="frame_id"			value="camera_link"/>
+		<arg name="odom_frame_id"		value="odom"/>
+	</include>
+	<!-- arm control and nav -->
+	<include file="$(find open_manipulator_controllers)/launch/joint_trajectory_controller.launch">
+		<arg name="sim" 			value="$(arg sim)"/>
+		<arg name="rviz_config" 	value="$(arg rviz_config)"/> <!--use custom rviz file-->
+	</include>
+	<!--Link rtabmap and moveit tfs-->
+	<node pkg="tf2_ros" type="static_transform_publisher" name="map_linker" args="0 0 0 0 0 0 1 world map" />" />
+</launch>
+
